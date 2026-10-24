@@ -106,7 +106,7 @@ export function classify(e: AuditEvent): Classification {
 // Which demo scenario an event belongs to (used for grouping in the UI only).
 export function scenario(e: AuditEvent): Classification["kb"] {
   if (e.resource_type === "public_directory") return "KB3";
-  if (e.action === "hr_terminate" || /terminated|disabled/.test(e.reason)) return "KB2";
+  if (e.action === "hr_terminate" || /terminated_account|disabled_account/.test(e.reason)) return "KB2";
   if (e.resource_type === "record" || e.resource_type === "billing") return "KB1";
   if (e.resource_type === "patients" || e.action === "register") {
     return e.role === "anonymous" || /self_regist|invalid_session|unauthenticated/.test(e.reason) ? "KB3" : "KB2";

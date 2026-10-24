@@ -7,7 +7,8 @@ import { DEMO_PASSWORD, reset } from "../scripts/scenario";
 
 const BASE = process.env.BASE_URL ?? "http://localhost:3000";
 const SHOTS = "demo/screenshots";
-const READ = Number(process.env.READ_MS ?? 2500); // how long a viewer gets to read each screen
+const READ = Number(process.env.READ_MS ?? 1500); // how long a viewer gets to read each screen
+const SIZE = { width: 1440, height: 900 };
 
 test.describe.configure({ mode: "serial" });
 
@@ -32,6 +33,8 @@ async function shot(page: Page, name: string) {
 }
 
 async function logout(page: Page) {
+  // Title cards cover the header, so leave them before looking for the button.
+  if (page.url().includes("/demo/card")) await page.goto("/dashboard");
   const btn = page.getByRole("button", { name: "Log out" });
   if (await btn.isVisible().catch(() => false)) await btn.click();
 }
@@ -43,7 +46,10 @@ async function loginUI(page: Page, user: string, hardened: boolean) {
   await page.fill('input[name="password"]', DEMO_PASSWORD);
   if (hardened) await page.getByTestId("ack").check();
   await page.getByRole("button", { name: "Log in" }).click();
-  if (!hardened) return;
+  if (!hardened) {
+    await page.waitForURL("**/dashboard");
+    return;
+  }
   // Hardened: wait for either the MFA step or a login error (e.g. disabled account).
   const code = page.getByTestId("mfa-code");
   await Promise.race([code.waitFor(), page.getByTestId("login-error").waitFor()]);
@@ -95,7 +101,7 @@ async function runMode(page: Page, mode: "legacy" | "hardened") {
   await card(page, "Bot finished", describeBot(bot), 4000);
   await page.goto("/doctors");
   if (H) await expect(page.getByText("429 Too Many Requests")).toBeVisible();
-  else await expect(page.getByText("Find a Doctor")).toBeVisible();
+  else await expect(page.getByRole("heading", { name: "Find a Doctor" })).toBeVisible();
   await shot(page, `step-${mode}-3`);
 
   // Step 4 — Report: the Incident Analyzer.
@@ -114,12 +120,13 @@ test("record demo", async ({ browser }) => {
   await reset(BASE);
 
   // Warm-up context (not part of the video): compile pages on a cold dev server.
-  const warm = await browser.newContext({ recordVideo: undefined });
+  const warm = await browser.newContext({ viewport: SIZE });
   const w = await warm.newPage();
   for (const p of ["/login", "/doctors", "/demo/card?text=warmup", "/terms"]) await w.goto(p);
   await warm.close();
 
-  const context = await browser.newContext();
+  // Contexts made by hand do not inherit `use.video`, so record explicitly.
+  const context = await browser.newContext({ viewport: SIZE, recordVideo: { dir: "test-results/video", size: SIZE } });
   await context.addInitScript(CURSOR);
   const page = await context.newPage();
 
