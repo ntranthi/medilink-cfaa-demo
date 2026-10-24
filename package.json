@@ -6,22 +6,48 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "node --import tsx --test tests/*.test.ts",
+    "db:push": "drizzle-kit push",
+    "db:seed": "tsx db/seed.ts",
+    "db:reset": "tsx db/seed.ts",
+    "scenario": "tsx scripts/scenario.ts",
+    "bot": "tsx scripts/bot.ts",
+    "demo:record": "playwright test && tsx scripts/record.ts",
+    "demo:record:prod": "BASE_URL=$(grep -E \"^BASE_URL=\" .env.production.local | cut -d= -f2- | tr -d '\"') pnpm demo:record"
   },
   "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "drizzle-orm": "^0.45.4",
     "next": "16.4.3",
+    "pg": "^8.23.1",
     "react": "19.3.0",
     "react-dom": "19.3.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.1",
     "@tailwindcss/turbopack": "^4",
     "@types/node": "^20",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "drizzle-kit": "^0.31.11",
     "eslint": "^9",
     "eslint-config-next": "16.4.3",
+    "ffmpeg-static": "^5.3.0",
     "tailwindcss": "^4",
+    "tsx": "^4.23.15",
     "typescript": "^5"
   },
-  "packageManager": "pnpm@10.30.3"
+  "packageManager": "pnpm@10.30.3",
+  "description": "CO5159 CA demo — MediLink portal + CFAA Incident Analyzer (fictional)",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "ffmpeg-static"
+    ]
+  }
 }

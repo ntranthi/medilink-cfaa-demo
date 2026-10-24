@@ -1,0 +1,6 @@
+User-agent: *
+Disallow: /api/
+Disallow: /patients/
+Disallow: /billing/
+Disallow: /admin
+Disallow: /analyzer

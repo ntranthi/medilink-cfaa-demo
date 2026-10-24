@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Every page reads the DB and the session cookie, so nothing is static.
+  // forbidden() → HTTP 403 + app/forbidden.tsx (used when the guard denies a page).
+  experimental: { authInterrupts: true },
   turbopack: {
     rules: {
       "*.css": {
