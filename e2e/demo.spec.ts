@@ -7,7 +7,7 @@ import { DEMO_PASSWORD, reset } from "../scripts/scenario";
 
 const BASE = process.env.BASE_URL ?? "http://localhost:3000";
 const SHOTS = "demo/screenshots";
-const READ = Number(process.env.READ_MS ?? 1500); // how long a viewer gets to read each screen
+const READ = Number(process.env.READ_MS ?? 4500); // how long a viewer gets to read each screen
 const SIZE = { width: 1440, height: 900 };
 
 test.describe.configure({ mode: "serial" });
@@ -22,7 +22,7 @@ const CURSOR = `
   document.addEventListener('mouseup', () => { d.style.background = 'rgba(220,38,38,.75)'; }, true);
 `;
 
-async function card(page: Page, text: string, sub = "", ms = 3500) {
+async function card(page: Page, text: string, sub = "", ms = 6000) {
   await page.goto(`/demo/card?text=${encodeURIComponent(text)}&sub=${encodeURIComponent(sub)}`);
   await page.waitForTimeout(ms);
 }

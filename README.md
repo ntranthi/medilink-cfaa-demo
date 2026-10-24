@@ -2,7 +2,7 @@
 
 **Production:** https://medilink-cfaa-demo.vercel.app
 **Repo:** https://github.com/ntranthi/medilink-cfaa-demo
-**Video:** `demo/medilink-cfaa-demo.mp4` (regenerate with `pnpm demo:record`)
+**Video:** [`demo/medilink-cfaa-demo.mp4`](demo/medilink-cfaa-demo.mp4) — 3 min 27 s, 1080p H.264, recorded against production with `pnpm demo:record:prod`
 
 > Fictional demo — no real PHI. MediLink Health Inc. does not exist. Scope is the Computer Fraud and Abuse Act,
 > 18 U.S.C. § 1030, only. HIPAA is **out of scope** and nothing here claims HIPAA compliance.
@@ -154,7 +154,7 @@ with the same class (VALID events are not incidents). Only **admissible** rows f
 when there are none (legacy), the total is shown as *"not provable"* with the reconstructed figure. "Exposed" records
 are patient rows actually returned to an actor without (sufficient) authorization — denied requests expose nothing.
 
-Hardened demo run with defaults: 5 incidents × 4 h × $150 + ⌈127/100⌉ × 2 h × $150 + 0 × $5 + $1,500 = **$5,100 ≥ $5,000**.
+Hardened demo run with defaults (as recorded): 5 incidents × 4 h × $150 + ⌈130/100⌉ × 2 h × $150 + 0 × $5 + $1,500 = **$5,100 ≥ $5,000**; `/api/audit/verify` → `{"ok":true,"length":260}`.
 
 ## 9. Giới hạn của demo (Limitations)
 

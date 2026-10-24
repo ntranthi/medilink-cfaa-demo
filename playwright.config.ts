@@ -18,7 +18,7 @@ export default defineConfig({
     baseURL,
     viewport: { width: 1440, height: 900 },
     // slowMo so a viewer can follow each click in the recording.
-    launchOptions: { slowMo: Number(process.env.SLOWMO ?? 250) },
+    launchOptions: { slowMo: Number(process.env.SLOWMO ?? 500) },
     locale: "en-US",
   },
   webServer: local
