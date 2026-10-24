@@ -73,5 +73,5 @@ test("loss: hardened demo run crosses the $5,000 threshold with default costs", 
   const loss = computeLoss(events, incidents, DEFAULT_COSTS, 20);
   assert.ok(loss.total >= 5000, `total ${loss.total}`);
   assert.equal(loss.exposedRecords, 0);
-  assert.equal(loss.cumulative.length, events.length);
+  assert.equal(Object.keys(loss.cumulative).length, events.length);
 });

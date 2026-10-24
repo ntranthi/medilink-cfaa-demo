@@ -1,5 +1,5 @@
 import { allAudit, verifyChain } from "./audit";
-import { buildIncidents, classifyAll, computeLoss } from "./analyzer/loss";
+import { buildIncidents, classifyAll, computeLoss, lossBasis } from "./analyzer/loss";
 import { DEFAULT_COSTS, LOSS_THRESHOLD_USD, type CostTable } from "./analyzer/costs";
 import { patientCount } from "./data";
 import { getMode } from "./mode";
@@ -8,8 +8,9 @@ import { getMode } from "./mode";
 export async function buildReport(costs: CostTable = DEFAULT_COSTS) {
   const [rows, mode, totalPatients] = await Promise.all([allAudit(), getMode(), patientCount()]);
   const events = classifyAll(rows);
-  const incidents = buildIncidents(events);
-  const loss = computeLoss(events, incidents, costs, totalPatients);
+  const { basis, provable } = lossBasis(events);
+  const incidents = buildIncidents(basis);
+  const loss = computeLoss(basis, incidents, costs, totalPatients);
   const byMode = {
     legacy: events.filter((e) => e.mode === "legacy").length,
     hardened: events.filter((e) => e.mode === "hardened").length,
@@ -24,6 +25,7 @@ export async function buildReport(costs: CostTable = DEFAULT_COSTS) {
     incidents,
     costs,
     loss,
+    provable,
     admissible: byMode.hardened,
     reconstructed: byMode.legacy,
     totalPatients,

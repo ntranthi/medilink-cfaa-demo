@@ -4,6 +4,13 @@
 // Also imported by e2e/demo.spec.ts for the non-UI parts (reset, bot, report checks).
 import { describeBot, runBot, type BotResult } from "./bot";
 
+// Pick up DEMO_ADMIN_RESET_TOKEN (and BASE_URL) from the local env file when run outside Next.
+for (const f of [".env.local", ".env.production.local"]) {
+  try {
+    process.loadEnvFile(f);
+  } catch {}
+}
+
 export const DEMO_PASSWORD = "Demo1234!";
 const token = () => process.env.DEMO_ADMIN_RESET_TOKEN ?? "demo-reset-token";
 const admin = () => ({ authorization: `Bearer ${token()}`, "content-type": "application/json" });
@@ -51,7 +58,8 @@ export async function runScenario(base: string, mode: "legacy" | "hardened"): Pr
   steps.push({
     step: "1 KB1 support.lan → /patients/P013/record",
     observed: `HTTP ${rec.status}${html.includes("Outside your scope") ? " Outside your scope" : html.includes("Jordan Blake") ? " record shown" : ""}`,
-    pass: H ? rec.status === 403 && html.includes("Outside your scope") : rec.status === 200 && html.includes("Jordan Blake"),
+    // forbidden.tsx is a client component, so plain HTTP sees the 403 status + Next error digest, not the text.
+    pass: H ? rec.status === 403 : rec.status === 200 && html.includes("Jordan Blake"),
   });
 
   // Step 2 — KB2
@@ -77,12 +85,12 @@ export async function runScenario(base: string, mode: "legacy" | "hardened"): Pr
 
   // Step 4 — Report
   const report = (await (await fetch(`${base}/api/analyzer/report.json`)).json()) as {
-    incidents: unknown[]; loss: { total: number }; verify: { ok: boolean; length: number }; admissible: number;
+    incidents: unknown[]; loss: { total: number }; verify: { ok: boolean; length: number }; provable: boolean;
     events: { mode: string; c: { cls: string } }[];
   };
   const mine = report.events.filter((e) => e.mode === mode);
   const classes = [...new Set(mine.map((e) => e.c.cls))].sort().join(",");
-  const provable = report.admissible > 0;
+  const provable = report.provable;
   steps.push({
     step: "4 Report /api/analyzer/report.json",
     observed: `${mine.length} events in ${mode}; classes ${classes}; loss $${report.loss.total} (${provable ? "provable" : "not provable"}); verify ${report.verify.ok ? "ok" : "BROKEN"} len ${report.verify.length}`,

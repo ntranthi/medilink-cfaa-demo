@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { COST_LABELS, DEFAULT_COSTS, type CostTable } from "@/lib/analyzer/costs";
-import { buildIncidents, computeLoss } from "@/lib/analyzer/loss";
+import { buildIncidents, computeLoss, lossBasis } from "@/lib/analyzer/loss";
 import type { Cls } from "@/lib/analyzer/classify";
 import type { Report } from "@/lib/report";
 
@@ -17,8 +17,9 @@ const usd = (n: number) => "$" + Math.round(n).toLocaleString("en-US");
 export function AnalyzerView({ report }: { report: Report }) {
   const [costs, setCosts] = useState<CostTable>(report.costs);
   const live = useMemo(() => {
-    const incidents = buildIncidents(report.events);
-    return { ...report, costs, incidents, loss: computeLoss(report.events, incidents, costs, report.totalPatients) };
+    const { basis } = lossBasis(report.events);
+    const incidents = buildIncidents(basis);
+    return { ...report, costs, incidents, loss: computeLoss(basis, incidents, costs, report.totalPatients) };
   }, [report, costs]);
 
   return (
@@ -79,7 +80,7 @@ function CostEditor({ costs, onChange }: { costs: CostTable; onChange: (c: CostT
 
 export function LossSummary({ report }: { report: Report }) {
   const { loss, threshold, mode } = report;
-  const provable = report.admissible > 0;
+  const { provable } = report;
   const pct = Math.min(100, (loss.total / threshold) * 100);
   return (
     <div className="card" data-testid="loss">
@@ -95,6 +96,9 @@ export function LossSummary({ report }: { report: Report }) {
               ? <span className="font-semibold text-green-700">≥ {usd(threshold)} in 1 year → civil action available under § 1030(g) / § 1030(c)(4)(A)(i)(I)</span>
               : <span className="font-semibold text-orange-700">below the {usd(threshold)} threshold</span>
             : <>no admissible log in legacy mode — the {usd(loss.total)} figure is reconstructed for the demo and could not be proven in court (mode: {mode})</>}
+        </div>
+        <div className="w-full text-xs text-neutral-500">
+          Basis: {provable ? `${loss.events} admissible (hardened) events only — legacy rows are excluded from the claim` : `${loss.events} reconstructed legacy events`}.
         </div>
       </div>
       <div className="mt-3 h-4 w-full overflow-hidden rounded bg-neutral-200">
@@ -116,7 +120,7 @@ export function LossSummary({ report }: { report: Report }) {
 export function IncidentTable({ report }: { report: Report }) {
   return (
     <div className="card">
-      <h2 className="font-semibold">Incidents <span className="text-xs font-normal text-neutral-500">(contiguous events, same actor + class; VALID events are not incidents)</span></h2>
+      <h2 className="font-semibold">Incidents <span className="text-xs font-normal text-neutral-500">(contiguous events, same actor + class, within the loss basis; VALID events are not incidents)</span></h2>
       {report.incidents.length === 0 ? <p className="mt-2 text-sm text-neutral-500">No incidents yet. Run the demo scenario.</p> : (
         <table className="mt-2 w-full text-sm">
           <thead><tr><th className="th">#</th><th className="th">Scenario</th><th className="th">Actor</th><th className="th">Class</th><th className="th">Events</th><th className="th">Evidence</th></tr></thead>
@@ -176,7 +180,7 @@ export function Timeline({ report }: { report: Report }) {
             <tr><th className="th">#</th><th className="th">Time</th><th className="th">Mode</th><th className="th">Actor</th><th className="th">Action</th><th className="th">Resource</th><th className="th">Outcome</th><th className="th">Class</th><th className="th">Loss</th><th className="th">Cum.</th></tr>
           </thead>
           <tbody>
-            {events.map((e, i) => (
+            {events.map((e) => (
               <tr key={e.id} className="border-t border-neutral-100 align-top">
                 <td className="td">{e.id}</td>
                 <td className="td whitespace-nowrap font-mono">{e.ts.slice(5, 19).replace("T", " ")}</td>
@@ -191,8 +195,8 @@ export function Timeline({ report }: { report: Report }) {
                   <div className="text-neutral-500">{e.c.vi}</div>
                   <div className={e.c.evidence === "admissible" ? "text-green-700" : "text-neutral-400"}>evidence: {e.c.evidence}{e.c.evidence === "none" && " (legacy — reconstructed for demo)"}</div>
                 </td>
-                <td className="td whitespace-nowrap">{usd(loss.perEvent[i])}</td>
-                <td className="td whitespace-nowrap">{usd(loss.cumulative[i])}</td>
+                <td className="td whitespace-nowrap">{e.id in loss.perEvent ? usd(loss.perEvent[e.id]) : "—"}</td>
+                <td className="td whitespace-nowrap">{e.id in loss.cumulative ? usd(loss.cumulative[e.id]) : "—"}</td>
               </tr>
             ))}
           </tbody>

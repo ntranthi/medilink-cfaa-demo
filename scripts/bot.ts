@@ -23,7 +23,7 @@ export async function runBot(base: string, opts = { doctors: 100, api: 20 }): Pr
   const reg = await fetch(`${base}/api/register`, {
     method: "POST",
     headers: { "content-type": "application/json", "user-agent": UA },
-    body: JSON.stringify({ username: `bot.fake.${Date.now().toString(36)}`, password: "bot" }),
+    body: JSON.stringify({ username: `bot.fake.${Date.now().toString(36)}`, password: "bot-pass-1" }),
   });
   r.register = reg.status;
   const setCookie = reg.headers.get("set-cookie") ?? "";

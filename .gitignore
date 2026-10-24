@@ -44,3 +44,6 @@ next-env.d.ts
 /test-results
 /demo/clips.json
 /demo/clips.txt
+/.claude
+/.agents
+skills-lock.json

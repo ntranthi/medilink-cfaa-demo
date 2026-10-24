@@ -12,6 +12,13 @@ export function classifyAll(events: AuditEvent[]): Classified[] {
   return events.map((e) => ({ ...e, c: classify(e) }));
 }
 
+// Only admissible (hardened) rows can support a § 1030(g) claim. If there are none, the
+// legacy rows are used as a reconstructed, "not provable" estimate.
+export function lossBasis(events: Classified[]): { basis: Classified[]; provable: boolean } {
+  const admissible = events.filter((e) => e.evidence_quality === "admissible");
+  return admissible.length ? { basis: admissible, provable: true } : { basis: events, provable: false };
+}
+
 // An incident = a contiguous run of events by the same actor with the same CFAA class.
 // VALID_UNDER_CFAA runs are not incidents (nothing to sue over).
 export function buildIncidents(events: Classified[]): Incident[] {
@@ -38,8 +45,8 @@ export type Loss = {
   notification: number;
   hardening: number;
   total: number;
-  perEvent: number[]; // same order as events
-  cumulative: number[];
+  perEvent: Record<number, number>; // by event id; events outside the basis are absent
+  cumulative: Record<number, number>;
   formula: string;
 };
 
@@ -51,7 +58,10 @@ export function computeLoss(events: Classified[], incidents: Incident[], costs: 
   // Exposed = patient data actually returned to someone with no/insufficient authorization.
   // Denied requests expose nothing; VALID (policy-only) views are not CFAA loss.
   const exposed = new Set<string>();
-  const perEvent = events.map((e) => {
+  const perEvent: Record<number, number> = {};
+  const cumulative: Record<number, number> = {};
+  let run = 0;
+  for (const e of events) {
     let v = forensicPerEvent;
     if (firstIds.has(e.id)) v += investigation1;
     if (e.outcome === "allowed" && e.c.cls !== "VALID_UNDER_CFAA" && e.c.cls !== "GRAY_ZONE") {
@@ -60,8 +70,9 @@ export function computeLoss(events: Classified[], incidents: Incident[], costs: 
       else if (e.resource_type === "record" || e.resource_type === "billing") exposed.add(e.resource_id);
       v += (exposed.size - before) * costs.notificationUsdPerRecord;
     }
-    return v;
-  });
+    perEvent[e.id] = v;
+    cumulative[e.id] = run += v;
+  }
 
   // Forensic review is billed per started block of 100 events.
   const forensic = Math.ceil(events.length / 100) * costs.forensicHoursPer100Events * costs.investigatorRateUsd;
@@ -71,9 +82,6 @@ export function computeLoss(events: Classified[], incidents: Incident[], costs: 
   const total = investigation + forensic + notification + hardening;
 
   // Per-event column uses the prorated forensic share; the block rounding lands in the total.
-  let run = 0;
-  const cumulative = perEvent.map((v) => (run += v));
-
   return {
     incidents: incidents.length,
     events: events.length,
