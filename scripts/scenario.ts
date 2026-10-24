@@ -4,12 +4,10 @@
 // Also imported by e2e/demo.spec.ts for the non-UI parts (reset, bot, report checks).
 import { describeBot, runBot, type BotResult } from "./bot";
 
-// Pick up DEMO_ADMIN_RESET_TOKEN (and BASE_URL) from the local env file when run outside Next.
-for (const f of [".env.local", ".env.production.local"]) {
-  try {
-    process.loadEnvFile(f);
-  } catch {}
-}
+// BASE_URL + DEMO_ADMIN_RESET_TOKEN come from ENV_FILE (default .env.local; .env.production.local for prod).
+try {
+  process.loadEnvFile(process.env.ENV_FILE ?? ".env.local");
+} catch {}
 
 export const DEMO_PASSWORD = "Demo1234!";
 const token = () => process.env.DEMO_ADMIN_RESET_TOKEN ?? "demo-reset-token";

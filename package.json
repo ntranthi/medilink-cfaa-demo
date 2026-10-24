@@ -14,7 +14,8 @@
     "scenario": "tsx scripts/scenario.ts",
     "bot": "tsx scripts/bot.ts",
     "demo:record": "playwright test && tsx scripts/record.ts",
-    "demo:record:prod": "BASE_URL=$(grep -E \"^BASE_URL=\" .env.production.local | cut -d= -f2- | tr -d '\"') pnpm demo:record"
+    "demo:record:prod": "ENV_FILE=.env.production.local pnpm demo:record",
+    "scenario:prod": "ENV_FILE=.env.production.local pnpm scenario"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
@@ -40,7 +41,7 @@
     "typescript": "^5"
   },
   "packageManager": "pnpm@10.30.3",
-  "description": "CO5159 CA demo — MediLink portal + CFAA Incident Analyzer (fictional)",
+  "description": "CO5159 CA demo \u2014 MediLink portal + CFAA Incident Analyzer (fictional)",
   "license": "MIT",
   "engines": {
     "node": ">=20"

@@ -1,5 +1,9 @@
 import { defineConfig } from "@playwright/test";
 
+try {
+  process.loadEnvFile(process.env.ENV_FILE ?? ".env.local");
+} catch {}
+
 const baseURL = process.env.BASE_URL ?? "http://localhost:3000";
 const local = /localhost|127\.0\.0\.1/.test(baseURL);
 
