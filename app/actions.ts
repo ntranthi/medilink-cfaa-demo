@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
 import { breakGlass } from "@/db/schema";
@@ -18,7 +19,7 @@ export async function toggleModeAction() {
     mode: next, actor: user.username, role: "admin", action: "set_mode", resource_type: "settings", resource_id: next,
     outcome: "allowed", reason: "admin_toggle", ip: req.ip, user_agent: req.userAgent, request_path: req.path,
   });
-  redirect("/dashboard");
+  revalidatePath("/", "layout");
 }
 
 export async function logoutAction() {

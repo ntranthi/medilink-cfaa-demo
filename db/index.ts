@@ -10,15 +10,14 @@ if (!process.env.DATABASE_URL) {
 }
 
 const g = globalThis as unknown as { __pool?: Pool };
-const url = process.env.DATABASE_URL;
-if (!url) throw new Error("DATABASE_URL is not set");
+const url = process.env.DATABASE_URL ?? "";
 
 export const pool =
   g.__pool ??
   new Pool({
     connectionString: url,
     max: 5,
-    ssl: url.includes("localhost") ? undefined : { rejectUnauthorized: false },
+    ssl: url.includes("localhost") || !url ? undefined : { rejectUnauthorized: false },
   });
 g.__pool = pool;
 

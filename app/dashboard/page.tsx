@@ -35,10 +35,10 @@ export default async function Dashboard() {
             <p className="text-sm text-neutral-600">Mode toggle, alerts, HR webhook, reset.</p>
           </Link>
         ) : (
-          <Link href="/doctors" className="card hover:border-blue-400">
+          <a href="/doctors" className="card hover:border-blue-400">
             <h2 className="font-semibold">Find a Doctor</h2>
             <p className="text-sm text-neutral-600">Public directory.</p>
-          </Link>
+          </a>
         )}
       </div>
       {user.role === "admin" && (

@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
 import { patients } from "@/db/schema";
@@ -30,8 +29,8 @@ export default async function Patients() {
               <td className="td">{p.assignedDoctor}{user.role === "doctor" && p.assignedDoctor === user.username ? " (you)" : ""}</td>
               <td className="td">{p.lastAppointment}</td>
               <td className="td space-x-2 whitespace-nowrap">
-                <Link href={`/patients/${p.id}/record`} className="underline">Record</Link>
-                <Link href={`/billing/${p.id}`} className="underline">Billing</Link>
+                <a href={`/patients/${p.id}/record`} className="underline" data-testid={`record-${p.id}`}>Record</a>
+                <a href={`/billing/${p.id}`} className="underline">Billing</a>
               </td>
             </tr>
           ))}

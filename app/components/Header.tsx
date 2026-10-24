@@ -24,7 +24,7 @@ export async function Header() {
           </form>
         )}
         <nav className="ml-auto flex flex-wrap items-center gap-3 text-sm">
-          <Link href="/doctors">Find a Doctor</Link>
+          <a href="/doctors">Find a Doctor</a>
           {user && (
             <>
               <Link href="/dashboard">Dashboard</Link>
