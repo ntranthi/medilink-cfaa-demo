@@ -24,6 +24,8 @@ Ba tình huống (KB) trong báo cáo:
 
 ## 2. Kiến trúc (Architecture)
 
+![Kiến trúc MediLink demo](demo/architecture.png)
+
 ```mermaid
 flowchart LR
   B[Browser / scripts] -->|every request| P[proxy.ts<br/>/doctors only: rate limit + bot flags]
