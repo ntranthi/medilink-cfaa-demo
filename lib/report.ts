@@ -1,5 +1,5 @@
 import { allAudit, verifyChain } from "./audit";
-import { buildIncidents, classifyAll, computeLoss, lossBasis } from "./analyzer/loss";
+import { buildIncidents, classifyAll, computeLoss, lossBasis, lossByActor } from "./analyzer/loss";
 import { DEFAULT_COSTS, LOSS_THRESHOLD_USD, type CostTable } from "./analyzer/costs";
 import { patientCount } from "./data";
 import { getMode } from "./mode";
@@ -10,6 +10,8 @@ export async function buildReport(costs: CostTable = DEFAULT_COSTS) {
   const events = classifyAll(rows);
   const { basis, provable } = lossBasis(events);
   const incidents = buildIncidents(basis);
+  // Per-attacker figures decide the threshold; the combined total is for reference only.
+  const byActor = lossByActor(basis, incidents, costs, totalPatients, LOSS_THRESHOLD_USD);
   const loss = computeLoss(basis, incidents, costs, totalPatients);
   const byMode = {
     legacy: events.filter((e) => e.mode === "legacy").length,
@@ -24,6 +26,7 @@ export async function buildReport(costs: CostTable = DEFAULT_COSTS) {
     events,
     incidents,
     costs,
+    byActor,
     loss,
     provable,
     admissible: byMode.hardened,

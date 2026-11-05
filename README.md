@@ -64,7 +64,7 @@ pnpm dev                            # http://localhost:3000
 Other scripts:
 
 ```bash
-pnpm test             # unit tests: 6 classification rules, loss threshold, tamper detection
+pnpm test             # unit tests: 6 classification rules, per-attacker loss threshold, tamper detection
 pnpm lint
 pnpm scenario         # reset → run steps 1–4 in legacy, then in hardened; asserts the expected outcomes
 pnpm bot              # just the KB3 scraper against BASE_URL
@@ -105,7 +105,7 @@ Mode toggle: header button (admin) or `POST /api/demo/mode {"mode":"hardened"}` 
 | 1 — KB1 | `support.lan` opens `/patients/P013/record` | 200, record shown. Analyzer: **VALID_UNDER_CFAA**, "policy violation only — Van Buren" | 403 "Outside your scope", audit `denied scope_violation`, admin alert. Analyzer: **EXCEEDS_AUTHORIZED_ACCESS** § 1030(a)(2) |
 | 2 — KB2 | HR terminates `exstaff.tran`; `exstaff.tran` logs in, downloads `/api/patients?format=csv` | login OK, CSV 200. Analyzer: **WITHOUT_AUTHORIZATION** but evidence *none* | login denied `disabled_account_login`, red admin alert. Analyzer: **WITHOUT_AUTHORIZATION** § 1030(a)(2), evidence *admissible* |
 | 3 — KB3 | `scripts/bot.ts`: 100× `/doctors` + 20× `/api/patients` with a self-registered / fake cookie | all 200, full dataset scraped | `/doctors`: 20 OK then 429, `bot_suspected`, **GRAY_ZONE** (hiQ). `/api/patients`: 401, **WITHOUT_AUTHORIZATION** |
-| 4 — Report | open `/analyzer` | events shown, evidence none, loss "not provable" | incidents classified, cumulative loss ≥ $5,000 with the default cost table, `/api/audit/verify` → ok |
+| 4 — Report | open `/analyzer` | events shown, evidence none, loss "not provable" | incidents classified with admissible evidence, loss computed **per attacker** against $5,000 (with the default cost table no single attacker reaches it), `/api/audit/verify` → ok |
 
 Screenshots (from `pnpm demo:record`):
 
@@ -135,7 +135,10 @@ Each event in the Analyzer shows the English label, a short Vietnamese explanati
 quality: **admissible** (hardened, hash-chained log) or **none** (legacy, reconstructed for the demo).
 
 Civil action: § 1030(g) — loss ≥ $5,000 in any 1-year period (§ 1030(c)(4)(A)(i)(I)); 2 years from the act or from
-discovery of the damage.
+discovery of the damage. The $5,000 is measured **per defendant**: a § 1030(g) suit is brought against one person, so
+loss can be aggregated across victims and over the 1-year period (*Creative Computing v. Getloaded.com*, 9th Cir. 2004;
+narrower: *In re DoubleClick*, S.D.N.Y. 2001, single act only), but not across unrelated attackers. Only the United
+States may aggregate a "related course of conduct" across computers, and only in its own proceedings.
 
 ## 8. Giả định về chi phí tổn thất (Loss assumptions)
 
@@ -149,14 +152,22 @@ restoring the system).
 | Investigator rate | 150 | USD/hour |
 | Forensic log review | 2 | hours per 100 events (per started block) |
 | Patient notification letter | 5 | USD per exposed record |
-| System hardening after incident | 1,500 | USD one-off, once per report |
+| System hardening after incident | 1,500 | USD one-off, once per report, split evenly between attackers |
 
-Model ([`lib/analyzer/loss.ts`](lib/analyzer/loss.ts)): an *incident* is a contiguous run of events by the same actor
-with the same class (VALID events are not incidents). Only **admissible** rows form the basis of a provable total;
-when there are none (legacy), the total is shown as *"not provable"* with the reconstructed figure. "Exposed" records
-are patient rows actually returned to an actor without (sufficient) authorization — denied requests expose nothing.
+Model ([`lib/analyzer/loss.ts`](lib/analyzer/loss.ts)):
 
-Hardened demo run with defaults (as recorded): 5 incidents × 4 h × $150 + ⌈130/100⌉ × 2 h × $150 + 0 × $5 + $1,500 = **$5,100 ≥ $5,000**; `/api/audit/verify` → `{"ok":true,"length":260}`.
+* An *incident* is a run of events by the same actor with the same class; VALID events are not incidents and are
+  skipped when grouping.
+* **Loss is computed per attacker** (`lossByActor`): each actor with at least one incident is costed on their own
+  events only and compared with $5,000 on their own. The combined total of all attackers is shown for reference only
+  and is never compared with the threshold.
+* An attacker is an audit identity (username, or `anonymous@IP`). One person using several IPs appears as several
+  rows, so each row is a lower bound.
+* Only **admissible** rows form the basis of a provable figure; when there are none (legacy), figures are shown as
+  *"not provable"*. "Exposed" records are patient rows actually returned to an actor without (sufficient)
+  authorization — denied requests expose nothing.
+
+Hardened demo run with defaults: see the per-attacker table in `/analyzer` and `demo/screenshots/step-hardened-4.png`.
 
 ## 9. Giới hạn của demo (Limitations)
 
@@ -170,6 +181,11 @@ Hardened demo run with defaults (as recorded): 5 incidents × 4 h × $150 + ⌈1
   fingerprint; the HR webhook is unauthenticated apart from the demo token; the rate limiter uses a global advisory
   lock and a plain table; the audit log's append-only guarantee is a trigger plus code, not a separate DB role.
 * **Loss figures are assumptions**, labelled as such wherever they appear.
+* **No attacker in the demo reaches $5,000.** With the default cost table each attacker's own loss stays below the
+  threshold, so the § 1030(g) civil action on the $5,000 factor is not available against any of them. The violations
+  are still provable (admissible evidence), and other § 1030(c)(4)(A)(i) factors, e.g. (II) impairment of medical
+  care, do not depend on the amount. Scraping costs in the GRAY_ZONE are still counted as incidents; whether they are
+  recoverable "loss" under the CFAA is doubtful after *hiQ*.
 
 ## 10. Ghi chú dùng AI (AI usage note)
 

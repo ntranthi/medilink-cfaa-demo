@@ -84,6 +84,7 @@ export async function runScenario(base: string, mode: "legacy" | "hardened"): Pr
   // Step 4 — Report
   const report = (await (await fetch(`${base}/api/analyzer/report.json`)).json()) as {
     incidents: unknown[]; loss: { total: number }; verify: { ok: boolean; length: number }; provable: boolean;
+    byActor: { actor: string; meetsThreshold: boolean; loss: { total: number } }[];
     events: { mode: string; c: { cls: string } }[];
   };
   const mine = report.events.filter((e) => e.mode === mode);
@@ -91,8 +92,12 @@ export async function runScenario(base: string, mode: "legacy" | "hardened"): Pr
   const provable = report.provable;
   steps.push({
     step: "4 Report /api/analyzer/report.json",
-    observed: `${mine.length} events in ${mode}; classes ${classes}; loss $${report.loss.total} (${provable ? "provable" : "not provable"}); verify ${report.verify.ok ? "ok" : "BROKEN"} len ${report.verify.length}`,
-    pass: H ? provable && report.loss.total >= 5000 && report.verify.ok : !provable && report.verify.ok,
+    observed:
+      `${mine.length} events in ${mode}; classes ${classes}; ${provable ? "provable" : "not provable"}; ` +
+      `per attacker ${report.byActor.map((a) => `${a.actor} $${Math.round(a.loss.total)}${a.meetsThreshold ? " ≥$5k" : ""}`).join(", ")}; ` +
+      `combined $${report.loss.total} (reference); verify ${report.verify.ok ? "ok" : "BROKEN"} len ${report.verify.length}`,
+    // Threshold is per attacker; with default costs no single demo attacker reaches $5,000.
+    pass: H ? provable && report.byActor.length >= 3 && report.verify.ok : !provable && report.verify.ok,
   });
 
   return { steps, bot };

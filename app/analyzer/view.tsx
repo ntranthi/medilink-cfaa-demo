@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { COST_LABELS, DEFAULT_COSTS, type CostTable } from "@/lib/analyzer/costs";
-import { buildIncidents, computeLoss, lossBasis } from "@/lib/analyzer/loss";
+import { buildIncidents, computeLoss, lossBasis, lossByActor } from "@/lib/analyzer/loss";
 import type { Cls } from "@/lib/analyzer/classify";
 import type { Report } from "@/lib/report";
 
@@ -19,7 +19,13 @@ export function AnalyzerView({ report }: { report: Report }) {
   const live = useMemo(() => {
     const { basis } = lossBasis(report.events);
     const incidents = buildIncidents(basis);
-    return { ...report, costs, incidents, loss: computeLoss(basis, incidents, costs, report.totalPatients) };
+    return {
+      ...report,
+      costs,
+      incidents,
+      byActor: lossByActor(basis, incidents, costs, report.totalPatients, report.threshold),
+      loss: computeLoss(basis, incidents, costs, report.totalPatients),
+    };
   }, [report, costs]);
 
   return (
@@ -79,39 +85,58 @@ function CostEditor({ costs, onChange }: { costs: CostTable; onChange: (c: CostT
 }
 
 export function LossSummary({ report }: { report: Report }) {
-  const { loss, threshold, mode } = report;
-  const { provable } = report;
-  const pct = Math.min(100, (loss.total / threshold) * 100);
+  const { loss, threshold, mode, provable, byActor } = report;
+  const top = byActor[0];
+  const qualifying = byActor.filter((a) => a.meetsThreshold);
   return (
     <div className="card" data-testid="loss">
-      <h2 className="font-semibold">Loss estimate vs § 1030(g) threshold</h2>
-      <p className="text-xs text-neutral-500">“Loss” per § 1030(e)(11): cost of responding, damage assessment, restoring. Figures are demo assumptions.</p>
+      <h2 className="font-semibold">Loss per attacker vs § 1030(g) threshold</h2>
+      <p className="text-xs text-neutral-500">
+        “Loss” per § 1030(e)(11): cost of responding, damage assessment, restoring. The {usd(threshold)} threshold of
+        § 1030(c)(4)(A)(i)(I) applies to each defendant: losses add up across victims and over 1 year, but not across
+        unrelated attackers. Figures are demo assumptions.
+      </p>
       <div className="mt-3 flex flex-wrap items-baseline gap-4">
         <div className="text-4xl font-extrabold" data-testid="loss-total">
-          {provable ? usd(loss.total) : <span className="text-neutral-400">not provable</span>}
+          {!provable ? <span className="text-neutral-400">not provable</span> : top ? usd(top.loss.total) : usd(0)}
         </div>
         <div className="text-sm text-neutral-600">
-          {provable
-            ? loss.total >= threshold
-              ? <span className="font-semibold text-green-700">≥ {usd(threshold)} in 1 year → civil action available under § 1030(g) / § 1030(c)(4)(A)(i)(I)</span>
-              : <span className="font-semibold text-orange-700">below the {usd(threshold)} threshold</span>
-            : <>no admissible log in legacy mode — the {usd(loss.total)} figure is reconstructed for the demo and could not be proven in court (mode: {mode})</>}
+          {!provable
+            ? <>no admissible log in legacy mode — per-attacker figures below are reconstructed for the demo and could not be proven in court (mode: {mode})</>
+            : !top
+              ? <>no incidents</>
+              : qualifying.length
+                ? <span className="font-semibold text-green-700">highest single attacker ({top.actor}); {qualifying.length} attacker(s) ≥ {usd(threshold)} in 1 year → civil action available against them under § 1030(g)</span>
+                : <span className="font-semibold text-orange-700">highest single attacker ({top.actor}) — no attacker reaches {usd(threshold)}, so the $5,000 factor of § 1030(g) is not met against anyone</span>}
         </div>
         <div className="w-full text-xs text-neutral-500">
           Basis: {provable ? `${loss.events} admissible (hardened) events only — legacy rows are excluded from the claim` : `${loss.events} reconstructed legacy events`}.
         </div>
       </div>
-      <div className="mt-3 h-4 w-full overflow-hidden rounded bg-neutral-200">
-        <div className={`h-full ${provable ? (loss.total >= threshold ? "bg-green-600" : "bg-orange-500") : "bg-neutral-400"}`} style={{ width: `${pct}%` }} />
-      </div>
-      <div className="mt-1 flex justify-between text-xs text-neutral-500"><span>cumulative loss</span><span>{usd(threshold)} threshold</span></div>
-      <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-sm sm:grid-cols-4">
-        <dt className="text-neutral-500">Investigation</dt><dd>{usd(loss.investigation)} <span className="text-xs text-neutral-500">({loss.incidents} incidents)</span></dd>
-        <dt className="text-neutral-500">Forensic review</dt><dd>{usd(loss.forensic)} <span className="text-xs text-neutral-500">({loss.events} events)</span></dd>
-        <dt className="text-neutral-500">Notification</dt><dd>{usd(loss.notification)} <span className="text-xs text-neutral-500">({loss.exposedRecords} records)</span></dd>
-        <dt className="text-neutral-500">Hardening</dt><dd>{usd(loss.hardening)}</dd>
-      </dl>
-      <p className="mt-3 rounded bg-neutral-50 p-2 font-mono text-xs">{loss.formula}</p>
+      <table className="mt-3 w-full text-sm" data-testid="loss-by-actor">
+        <thead><tr><th className="th">Attacker</th><th className="th">Scenario</th><th className="th">Incidents</th><th className="th">Loss</th><th className="th w-1/3">vs {usd(threshold)}</th></tr></thead>
+        <tbody>
+          {byActor.map((a) => (
+            <tr key={a.actor} className="border-t border-neutral-100 align-top">
+              <td className="td font-mono text-xs">{a.actor}</td>
+              <td className="td">{a.kbs.join(", ")}</td>
+              <td className="td">{a.loss.incidents}</td>
+              <td className="td whitespace-nowrap font-semibold">{usd(a.loss.total)}</td>
+              <td className="td">
+                <div className="h-3 w-full overflow-hidden rounded bg-neutral-200">
+                  <div className={`h-full ${!provable ? "bg-neutral-400" : a.meetsThreshold ? "bg-green-600" : "bg-orange-500"}`} style={{ width: `${Math.min(100, (a.loss.total / threshold) * 100)}%` }} />
+                </div>
+                <div className="mt-1 font-mono text-[10px] text-neutral-500">{a.loss.formula}</div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="mt-3 text-xs text-neutral-500">
+        Reference only: all attackers combined = {usd(loss.total)}. This sum cannot be used for the threshold, because it mixes
+        different defendants. The one-off hardening cost is split evenly between attackers; one attacker using several IPs
+        appears as several rows, so each row is a lower bound.
+      </p>
       <p className="mt-2 text-xs text-neutral-600">Civil action window: 2 years from the act or from discovery of the damage (§ 1030(g)).</p>
     </div>
   );
@@ -147,7 +172,7 @@ const STEPS = [
   ["1 — KB1", "support.lan opens /patients/P013/record (Jordan Blake, VIP)", "200, record shown. VALID_UNDER_CFAA — policy violation only (Van Buren).", "403 “Outside your scope”, audit denied scope_violation, admin alert. EXCEEDS_AUTHORIZED_ACCESS § 1030(a)(2)."],
   ["2 — KB2", "HR terminates exstaff.tran; exstaff.tran logs in and downloads /api/patients?format=csv", "Login OK, CSV downloaded. WITHOUT_AUTHORIZATION but evidence none.", "Login denied disabled_account_login, admin alert. WITHOUT_AUTHORIZATION § 1030(a)(2), evidence admissible."],
   ["3 — KB3", "bot: 100× /doctors + 20× /api/patients with a self-registered / fake cookie", "All 200, full dataset scraped.", "/doctors: 20 OK then 429, bot_suspected, GRAY_ZONE (hiQ). /api/patients: 401, WITHOUT_AUTHORIZATION."],
-  ["4 — Report", "open /analyzer", "Events shown but evidence none; loss “not provable”.", "3 scenarios classified, cumulative loss ≥ $5,000 with default costs, /api/audit/verify → ok."],
+  ["4 — Report", "open /analyzer", "Events shown but evidence none; loss “not provable”.", "3 scenarios classified with admissible evidence, loss computed per attacker vs $5,000 (none reaches it with default costs), /api/audit/verify → ok."],
 ];
 
 export function ComparisonCard() {
@@ -170,14 +195,17 @@ export function ComparisonCard() {
 }
 
 export function Timeline({ report }: { report: Report }) {
-  const { events, loss } = report;
+  const { events } = report;
+  // Loss columns are per attacker: "Cum." runs within that attacker's own events.
+  const perEvent = Object.assign({}, ...report.byActor.map((a) => a.loss.perEvent)) as Record<number, number>;
+  const cumulative = Object.assign({}, ...report.byActor.map((a) => a.loss.cumulative)) as Record<number, number>;
   return (
     <div className="card">
       <h2 className="font-semibold">Timeline <span className="text-xs font-normal text-neutral-500">(oldest first, newest last)</span></h2>
       <div className="mt-2 max-h-[32rem] overflow-auto">
         <table className="w-full text-xs" data-testid="timeline">
           <thead className="sticky top-0 bg-white">
-            <tr><th className="th">#</th><th className="th">Time</th><th className="th">Mode</th><th className="th">Actor</th><th className="th">Action</th><th className="th">Resource</th><th className="th">Outcome</th><th className="th">Class</th><th className="th">Loss</th><th className="th">Cum.</th></tr>
+            <tr><th className="th">#</th><th className="th">Time</th><th className="th">Mode</th><th className="th">Actor</th><th className="th">Action</th><th className="th">Resource</th><th className="th">Outcome</th><th className="th">Class</th><th className="th">Loss</th><th className="th">Cum. (attacker)</th></tr>
           </thead>
           <tbody>
             {events.map((e) => (
@@ -195,8 +223,8 @@ export function Timeline({ report }: { report: Report }) {
                   <div className="text-neutral-500">{e.c.vi}</div>
                   <div className={e.c.evidence === "admissible" ? "text-green-700" : "text-neutral-400"}>evidence: {e.c.evidence}{e.c.evidence === "none" && " (legacy — reconstructed for demo)"}</div>
                 </td>
-                <td className="td whitespace-nowrap">{e.id in loss.perEvent ? usd(loss.perEvent[e.id]) : "—"}</td>
-                <td className="td whitespace-nowrap">{e.id in loss.cumulative ? usd(loss.cumulative[e.id]) : "—"}</td>
+                <td className="td whitespace-nowrap">{e.id in perEvent ? usd(perEvent[e.id]) : "—"}</td>
+                <td className="td whitespace-nowrap">{e.id in cumulative ? usd(cumulative[e.id]) : "—"}</td>
               </tr>
             ))}
           </tbody>

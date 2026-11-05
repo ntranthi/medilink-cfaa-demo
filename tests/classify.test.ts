@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { classify, type AuditEvent } from "../lib/analyzer/classify";
-import { buildIncidents, classifyAll, computeLoss } from "../lib/analyzer/loss";
-import { DEFAULT_COSTS } from "../lib/analyzer/costs";
+import { buildIncidents, classifyAll, computeLoss, lossByActor } from "../lib/analyzer/loss";
+import { DEFAULT_COSTS, LOSS_THRESHOLD_USD } from "../lib/analyzer/costs";
 
 let seq = 0;
 const ev = (p: Partial<AuditEvent>): AuditEvent => ({
@@ -57,7 +57,7 @@ test("rule 6: authenticated API scraping with fake account → WITHOUT_AUTHORIZA
   assert.match(c.note, /1030\(a\)\(6\)/);
 });
 
-test("loss: hardened demo run crosses the $5,000 threshold with default costs", () => {
+test("loss: hardened demo run — combined total ≥ $5,000 but no single attacker reaches it", () => {
   const events = classifyAll([
     ev({ actor: "support.lan", action: "login", resource_type: "session", reason: "mfa_ok" }),
     ev({ actor: "support.lan", outcome: "denied", reason: "scope_violation" }),
@@ -71,7 +71,36 @@ test("loss: hardened demo run crosses the $5,000 threshold with default costs", 
   const incidents = buildIncidents(events);
   assert.equal(incidents.length, 5);
   const loss = computeLoss(events, incidents, DEFAULT_COSTS, 20);
-  assert.ok(loss.total >= 5000, `total ${loss.total}`);
+  assert.ok(loss.total >= 5000, `combined total ${loss.total}`); // reference figure only
   assert.equal(loss.exposedRecords, 0);
   assert.equal(Object.keys(loss.cumulative).length, events.length);
+
+  const byActor = lossByActor(events, incidents, DEFAULT_COSTS, 20, LOSS_THRESHOLD_USD);
+  assert.deepEqual(byActor.map((a) => a.actor).sort(), ["anonymous@1.1.1.1", "exstaff.tran", "support.lan"]);
+  assert.ok(byActor.every((a) => !a.meetsThreshold), byActor.map((a) => `${a.actor} ${a.loss.total}`).join(", "));
+  // hardening is split, not charged to every attacker in full
+  assert.equal(byActor.reduce((s, a) => s + a.loss.hardening, 0), DEFAULT_COSTS.hardeningUsdOneOff);
+});
+
+test("loss per attacker: aggregates across victims and incidents for one attacker, never across attackers", () => {
+  // Alternating classes make each event its own incident (same actor + same class runs merge).
+  const mk = (actor: string, n: number) =>
+    Array.from({ length: n }, (_, i) =>
+      i % 2
+        ? ev({ actor, outcome: "denied", reason: "disabled_account", resource_id: `P00${i}` })
+        : ev({ actor, outcome: "denied", reason: "scope_violation", resource_id: `P00${i}` }),
+    );
+  // one insider, 6 incidents over several patients
+  const one = classifyAll(mk("insider", 6));
+  const r1 = lossByActor(one, buildIncidents(one), DEFAULT_COSTS, 20, LOSS_THRESHOLD_USD);
+  assert.equal(r1.length, 1);
+  assert.ok(r1[0].meetsThreshold, `insider ${r1[0].loss.total}`);
+
+  // six unrelated attackers with one incident each: combined would pass, each alone does not
+  const many = classifyAll(["a", "b", "c", "d", "e", "f"].flatMap((a) => mk(a, 1)));
+  const inc = buildIncidents(many);
+  assert.ok(computeLoss(many, inc, DEFAULT_COSTS, 20).total >= LOSS_THRESHOLD_USD);
+  const r6 = lossByActor(many, inc, DEFAULT_COSTS, 20, LOSS_THRESHOLD_USD);
+  assert.equal(r6.length, 6);
+  assert.ok(r6.every((a) => !a.meetsThreshold));
 });

@@ -91,7 +91,41 @@ export function computeLoss(events: Classified[], incidents: Incident[], costs: 
       `${incidents.length} incidents × ${costs.investigationHoursPerIncident} h × $${costs.investigatorRateUsd}` +
       ` + ⌈${events.length}/100⌉ × ${costs.forensicHoursPer100Events} h × $${costs.investigatorRateUsd}` +
       ` + ${exposed.size} records × $${costs.notificationUsdPerRecord}` +
-      ` + hardening $${hardening}` +
-      ` = $${total.toLocaleString("en-US")}`,
+      ` + hardening $${Math.round(hardening).toLocaleString("en-US")}` +
+      ` = $${Math.round(total).toLocaleString("en-US")}`,
   };
+}
+
+export type ActorLoss = {
+  actor: string;
+  kbs: Classification["kb"][];
+  classes: Classification["cls"][];
+  loss: Loss;
+  meetsThreshold: boolean;
+};
+
+// The § 1030(c)(4)(A)(i)(I) threshold is measured per defendant: a civil suit under
+// § 1030(g) is brought against one person, so loss can be aggregated across victims and
+// over a 1-year period, but NOT across unrelated attackers. Each actor with at least one
+// incident is therefore costed on their own events only, and compared with the threshold
+// on their own. The one-off hardening cost is a shared response cost, split evenly.
+// An actor is an audit identity (username, or anonymous@IP), so one attacker using
+// several IPs shows up as several actors: the per-actor figure is a lower bound.
+// ponytail: whole log treated as one 1-year window; fine for a demo, a rolling window if logs span years.
+export function lossByActor(events: Classified[], incidents: Incident[], costs: CostTable, totalPatients: number, threshold: number): ActorLoss[] {
+  const actors = [...new Set(incidents.map((i) => i.actor))];
+  const share = actors.length ? costs.hardeningUsdOneOff / actors.length : 0;
+  return actors
+    .map((actor) => {
+      const mine = incidents.filter((i) => i.actor === actor);
+      const loss = computeLoss(events.filter((e) => e.actor === actor), mine, { ...costs, hardeningUsdOneOff: share }, totalPatients);
+      return {
+        actor,
+        kbs: [...new Set(mine.map((i) => i.kb))],
+        classes: [...new Set(mine.map((i) => i.cls))],
+        loss,
+        meetsThreshold: loss.total >= threshold,
+      };
+    })
+    .sort((a, b) => b.loss.total - a.loss.total);
 }
