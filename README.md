@@ -3,6 +3,7 @@
 **Production:** https://medilink-cfaa-demo.vercel.app
 **Repo:** https://github.com/ntranthi/medilink-cfaa-demo
 **Video:** [`demo/medilink-cfaa-demo.mp4`](demo/medilink-cfaa-demo.mp4) — 3 min 27 s, 1080p H.264, recorded against production with `pnpm demo:record:prod`
+  The video predates the per-attacker loss change, so its Analyzer frames still show one combined total; the Analyzer screenshots below are current.
 
 > Fictional demo — no real PHI. MediLink Health Inc. does not exist. Scope is the Computer Fraud and Abuse Act,
 > 18 U.S.C. § 1030, only. HIPAA is **out of scope** and nothing here claims HIPAA compliance.
@@ -167,7 +168,15 @@ Model ([`lib/analyzer/loss.ts`](lib/analyzer/loss.ts)):
   *"not provable"*. "Exposed" records are patient rows actually returned to an actor without (sufficient)
   authorization — denied requests expose nothing.
 
-Hardened demo run with defaults: see the per-attacker table in `/analyzer` and `demo/screenshots/step-hardened-4.png`.
+Hardened demo run with defaults, measured on production; `/api/audit/verify` → `{"ok":true,"length":255}`:
+
+| Attacker | Scenario | Incidents | Loss | ≥ $5,000? |
+|----------|----------|-----------|------|-----------|
+| bot, `anonymous@IP` | KB3 | 3 | $2,900 | no |
+| `support.lan` | KB1 | 1 | $1,400 | no |
+| `exstaff.tran` | KB2 | 1 | $1,400 | no |
+
+All attackers combined: $5,100, shown for reference only. IP addresses are redacted in the screenshots.
 
 ## 9. Giới hạn của demo (Limitations)
 
